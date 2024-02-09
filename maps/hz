@@ -1,0 +1,141 @@
+admin.py
+
+from django.contrib import admin
+from .models import *
+
+admin.site.register(MapModel)
+admin.site.register(Info)
+
+
+apps.py
+
+from django.apps import AppConfig
+
+
+class MapsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "maps"
+
+
+forms.py
+
+from django import forms
+
+from .models import *
+
+
+class InfoForm(forms.ModelForm):
+    class Meta:
+        model = Info
+        fields = "__all__"
+
+
+class AsTextFileInput(forms.widgets.FileInput):
+    def value_from_datadict(self, data, files, name):
+        print("-------------------------")
+        print(files)
+        string = files.get(name).read().decode("utf-8")
+        return " ".join(string.split()) 
+
+
+class MapForm(forms.ModelForm):
+    class Meta:
+        model = MapModel
+        exclude = ("info",)
+        widgets = {"preview": AsTextFileInput(), "image": AsTextFileInput()}
+
+
+models.py
+
+from django.db import models
+
+
+class Info(models.Model):
+    author = models.CharField()
+    address = models.CharField()
+    description = models.CharField()
+
+
+class MapModel(models.Model):
+    name = models.CharField()
+    preview = models.CharField()
+    image = models.CharField()
+    info = models.ForeignKey(Info, on_delete=models.CASCADE)
+
+
+serializers.py
+
+from django.contrib.auth.models import User, Group
+from rest_framework import serializers
+from .models import *
+
+class InfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Info
+        fields = ["author", "address", "description"]
+
+class MapSerializer(serializers.ModelSerializer):
+    info = InfoSerializer(many=False)
+    class Meta:
+        model = MapModel
+        fields = ["name", "preview", "image", "info"]
+
+
+
+urls.py
+
+from django.urls import path, include
+
+from .views import *
+from rest_framework import routers
+
+router = routers.DefaultRouter()
+router.register(r"api/maps", MapsViewSet)
+
+urlpatterns = [
+    path("", include(router.urls)),
+    path("api/add_map", MapCreateView.as_view(), name="map-create"),
+]
+
+
+views.py
+
+
+from django.shortcuts import render
+from django.views import View
+from rest_framework import viewsets
+
+
+# Create your views here.
+# listings/views.py
+
+from .forms import *
+from .serializers import *
+
+
+class MapsViewSet(viewsets.ModelViewSet):
+    queryset = MapModel.objects.all()
+    serializer_class = MapSerializer
+
+
+class MapCreateView(View):
+    def get(self, request):
+        return render(
+            request, "maps/add_map.html", {"mapForm": MapForm(), "infoForm": InfoForm()}
+        )
+
+    def post(self, request):
+        map_form = MapForm(request.POST, request.FILES)
+        map_ = map_form.save(commit=False)
+        info_form = InfoForm(request.POST)
+        info_ = info_form.save()
+        map_.info = info_
+        map_form.save()
+
+        return render(
+            request,
+            "maps/add_map.html",
+            {"mapForm": map_form, "infoForm": info_form},
+        )
+
+

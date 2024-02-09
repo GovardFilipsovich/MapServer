@@ -1,0 +1,15 @@
+
+{% extends 'maps/base.html' %}
+
+{% block content %}
+
+ <h1>Create new Map</h1>
+
+<form action="" method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  {{ mapForm.as_p }}
+  {{ infoForm.as_p }}
+  <input type="submit" value="Submit">
+</form>
+
+{% endblock %}
